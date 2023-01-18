@@ -3,9 +3,7 @@
 /*Control Remoto*/
 #include <IRremote.h>
 
-/*Sensor de Tarjeta*/
 #include <SPI.h>
-#include <MFRC522.h>
 
 /*Pantalla LCD*/
 #include <Wire.h>                 // libreria de comunicacion por I2C
@@ -27,16 +25,16 @@
 #define contAux_1 0x1FE50AF
 #define contAux_2 0x1FED827
 #define contAux_3 0x1FEF807
+#define contAux_4 0x1FE30CF
+#define contAux_5 0x1FEB04F
+#define contAux_6 0x1FE708F
 
-/*Conect MFRC522
-  SDA(SS) 10
-  SCK     13
-  MOSI    11
-  MISO    12
-  RST     9
-  GND     GND
-  3.3v    3.3v
-*/
+#define contAux_VolPlus 0x1FE609F
+#define contAux_VolRest 0x1FEA05F
+#define contAux_CHPlus 0x1FEC03F
+#define contAux_CHRest 0x1FE40BF
+#define contAux_SCAN 0x1FE807F
+
 /*Conect LCD I2C
   SDA   A4
   SCL   A5
@@ -65,25 +63,23 @@
 
 //PINES
 #define SensorControlRemoto 2           // sensor KY-022 a pin digital 2
-#define RST_PIN             9
-#define SS_PIN              10
 #define Rele1               4
 #define sensorTemperatura   3
 
-byte LecturaUID[4];
-byte Usuario1[4] = {0x6C, 0xF2, 0xDD, 0x2B};  //Tarjeta Usuario 1
-
+//Control Remoto
 IRrecv irrecv(SensorControlRemoto);
 decode_results codigo;
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);  // crear una instacia MFRC522
-
+//LCD
 LiquidCrystal_I2C lcd (0x27, 2, 1, 0, 4, 5, 6, 7); // DIR, E, RW, RS, D4, D5, D6, D7
 
+//Sensor Temp Humd DHT11
 DHT dht(sensorTemperatura, DHT11);
 
+//Bluetooth
 SoftwareSerial miBT(6, 5);
 
+//Reloj
 RTC_DS3231 rtc;     // crea objeto del tipo RTC_DS3231
 
 //Variables Globales
@@ -91,19 +87,20 @@ int humd = 0;
 int temp = 0;
 char DataBluetooth = '0';
 
+int reloj[] = {2022, 1, 10, 18, 55};
+int indexReloj = 0;
+bool moodSettingClock = false;
+
 void setup() {
+  //Inicializamos
   Serial.begin(9600);
-  IrReceiver.begin(SensorControlRemoto, DISABLE_LED_FEEDBACK);     // inicializa recepcion de datos
-  irrecv.enableIRIn();
-
   miBT.begin(38400);
-
-  SPI.begin();
-  mfrc522.PCD_Init();
-
-  //Inicializamos DHT
   dht.begin();
   rtc.begin();
+  SPI.begin();
+
+  IrReceiver.begin(SensorControlRemoto, DISABLE_LED_FEEDBACK);     // inicializa recepcion de datos
+  irrecv.enableIRIn();
 
   //Establecer fecha y horario RTC3231
   rtc.adjust(DateTime(__DATE__, __TIME__));
@@ -117,23 +114,60 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("QUE ONDA!");
   lcd.setCursor(0, 1);
-  lcd.print("Precione Control");
-  
+  lcd.print("Presione Control");
+
   //Definimos las salidas
   pinMode(Rele1, OUTPUT);
 }
 
 void loop() {
-  
+  //Obtenemos los datos del DHT11
   temp = dht.readTemperature();
   humd = dht.readHumidity();
-  
-  //------------------------------------------------------------
-  if ( ! mfrc522.PICC_IsNewCardPresent() ) {
-    //---
-    if (irrecv.decode(&codigo)) {
-      Serial.println(codigo.value, HEX);
 
+  //------------------------------------------------------------
+
+  if (irrecv.decode(&codigo)) {
+    Serial.println(codigo.value, HEX);
+
+
+    if (moodSettingClock) {
+
+      if (codigo.value == contAux_VolPlus) {
+        reloj[indexReloj] += 1;
+        mostrarConfiguracionReloj(indexReloj);
+      }
+      if (codigo.value == contAux_VolRest) {
+        reloj[indexReloj] -= 1;
+        mostrarConfiguracionReloj(indexReloj);
+      }
+      if (codigo.value == contAux_CHPlus) {
+        indexReloj++;
+        if (indexReloj == 5) {
+          indexReloj = 0;
+        }
+        mostrarConfiguracionReloj(indexReloj);
+      }
+      if (codigo.value == contAux_CHRest) {
+        indexReloj--;
+        if (indexReloj == -1) {
+          indexReloj = 4;
+        }
+        mostrarConfiguracionReloj(indexReloj);
+      }
+      if (codigo.value == contAux_SCAN) {
+        int anio = reloj[0];
+        int meses = reloj[1];
+        int dias = reloj[2];
+        int horas = reloj[3];
+        int minutos = reloj[4];
+        rtc.adjust(DateTime(anio, meses, dias, horas, minutos));
+
+        moodSettingClock = false;
+        mostrarFechaHorario();
+      }
+
+    } else {
       if (codigo.value == contAux_1)    // si codigo recibido es igual a Boton_1
         prenderApagarRele(Rele1);
 
@@ -143,53 +177,27 @@ void loop() {
       if (codigo.value == contAux_3)
         mostrarFechaHorario();
 
-      irrecv.resume();
+      if (codigo.value == contAux_4) {
+        moodSettingClock = true;
+        mostrarPantalla(" Configuracion ", 0, true);
+        mostrarPantalla("De Fecha y Hora", 1, false);
+      }
+
     }
-    //---
-    if (miBT.available()) {
-      DataBluetooth = miBT.read();
 
-      if (DataBluetooth == '1') prenderApagarRele(Rele1);
-
-      if (DataBluetooth == '2') mostrarTempHumd();
-
-      if (DataBluetooth == '3') mostrarFechaHorario();
-    }
-    //---
-    return;
+    irrecv.resume();
   }
 
+  if (miBT.available()) {
+    DataBluetooth = miBT.read();
 
-  /*
-    // Select one of the cards
-    if (  mfrc522.PICC_ReadCardSerial()) {
-    return;
-    }*/
+    if (DataBluetooth == '1') prenderApagarRele(Rele1);
 
+    if (DataBluetooth == '2') mostrarTempHumd();
 
-  for (byte i = 0; i < mfrc522.uid.size; i++)
-    LecturaUID[i] = mfrc522.uid.uidByte[i];
-
-  if ( comparaUID(LecturaUID, Usuario1)) {
-    mostrarPantalla("Bienvenido", 0, true);
-    mostrarPantalla("Ivan Di Gruttola", 1, false);
-
-    delay(2000);
-
-    mostrarTempHumd();
+    if (DataBluetooth == '3') mostrarFechaHorario();
   }
-  else
-    mostrarPantalla("No te Conozco", 0, true);
 
-  mfrc522.PICC_HaltA();
-}
-
-
-boolean comparaUID( byte lectura[], byte usuario[]) {
-  for (byte i = 0 ; i < mfrc522.uid.size; i++)
-    if (lectura[i] != usuario[i]) return (false);
-
-  return (true);
 }
 
 void mostrarPantalla (String mensaje , int cursor, boolean clear) {
@@ -197,6 +205,57 @@ void mostrarPantalla (String mensaje , int cursor, boolean clear) {
 
   lcd.setCursor(0, cursor);    // ubica cursor en columna 0 y linea 0
   lcd.print(mensaje);  // escribe el texto
+}
+
+void mostrarConfiguracionReloj(int indexReloj) {
+  String thisString = "";
+  //Year
+  if (indexReloj == 0) {
+    mostrarPantalla("Year", 0, true);
+
+    thisString = String(reloj[indexReloj]);
+    mostrarPantalla(thisString, 1, false);
+  }
+  //Mounth
+  if (indexReloj == 1) {
+    mostrarPantalla("Mounth", 0, true);
+    
+    if ( reloj[indexReloj] > 12 )reloj[indexReloj] = 0;
+    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 12;
+    
+    thisString = String(reloj[indexReloj]);
+    mostrarPantalla(thisString, 1, false);
+  }
+  //Day
+  if (indexReloj == 2) {
+    mostrarPantalla("Day", 0, true);
+    
+    if ( reloj[indexReloj] > 31 ) reloj[indexReloj] = 0;
+    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 31;
+    
+    thisString = String(reloj[indexReloj]);
+    mostrarPantalla(thisString, 1, false);
+  }
+  //Hour
+  if (indexReloj == 3) {
+    mostrarPantalla("Hour", 0, true);
+
+    if ( reloj[indexReloj] > 23 ) reloj[indexReloj] = 0;
+    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 23;
+    
+    thisString = String(reloj[indexReloj]);
+    mostrarPantalla(thisString, 1, false);
+  }
+  //Minutos
+  if (indexReloj == 4) {
+    mostrarPantalla("Minutos", 0, true);
+
+    if ( reloj[indexReloj] > 59 ) reloj[indexReloj] = 0;
+    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 59;
+    
+    thisString = String(reloj[indexReloj]);
+    mostrarPantalla(thisString, 1, false);
+  }
 }
 
 void mostrarTempHumd() {
@@ -235,17 +294,17 @@ void mostrarFechaHorario() {
   lcd.print(":");
   lcd.print(fecha.second());
 
-/*
-  Serial.print(fecha.day());     // funcion que obtiene el dia de la fecha completa
-  Serial.print("/");       // caracter barra como separador
-  Serial.print(fecha.month());     // funcion que obtiene el mes de la fecha completa
-  Serial.print("/");       // caracter barra como separador
-  Serial.print(fecha.year());      // funcion que obtiene el año de la fecha completa
-  Serial.print(" ");       // caracter espacio en blanco como separador
-  Serial.print(fecha.hour());      // funcion que obtiene la hora de la fecha completa
-  Serial.print(":");       // caracter dos puntos como separador
-  Serial.print(fecha.minute());      // funcion que obtiene los minutos de la fecha completa
-  Serial.print(":");       // caracter dos puntos como separador
-  Serial.println(fecha.second());    // funcion que obtiene los segundos de la fecha completa
-*/
+  /*
+    Serial.print(fecha.day());     // funcion que obtiene el dia de la fecha completa
+    Serial.print("/");       // caracter barra como separador
+    Serial.print(fecha.month());     // funcion que obtiene el mes de la fecha completa
+    Serial.print("/");       // caracter barra como separador
+    Serial.print(fecha.year());      // funcion que obtiene el año de la fecha completa
+    Serial.print(" ");       // caracter espacio en blanco como separador
+    Serial.print(fecha.hour());      // funcion que obtiene la hora de la fecha completa
+    Serial.print(":");       // caracter dos puntos como separador
+    Serial.print(fecha.minute());      // funcion que obtiene los minutos de la fecha completa
+    Serial.print(":");       // caracter dos puntos como separador
+    Serial.println(fecha.second());    // funcion que obtiene los segundos de la fecha completa
+  */
 }
