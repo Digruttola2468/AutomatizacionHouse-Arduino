@@ -34,6 +34,7 @@
 #define contAux_CHPlus 0x1FEC03F
 #define contAux_CHRest 0x1FE40BF
 #define contAux_SCAN 0x1FE807F
+#define contAux_MUTE 0x1FE48B7
 
 /*Conect LCD I2C
   SDA   A4
@@ -133,28 +134,30 @@ void loop() {
 
     if (moodSettingClock) {
 
-      if (codigo.value == contAux_VolPlus) {
-        reloj[indexReloj] += 1;
-        mostrarConfiguracionReloj(indexReloj);
-      }
-      if (codigo.value == contAux_VolRest) {
-        reloj[indexReloj] -= 1;
-        mostrarConfiguracionReloj(indexReloj);
-      }
+      if (codigo.value == contAux_VolPlus) reloj[indexReloj] += 1;
+
+      if (codigo.value == contAux_VolRest) reloj[indexReloj] -= 1;
+
       if (codigo.value == contAux_CHPlus) {
         indexReloj++;
         if (indexReloj == 5) {
           indexReloj = 0;
         }
-        mostrarConfiguracionReloj(indexReloj);
       }
       if (codigo.value == contAux_CHRest) {
         indexReloj--;
         if (indexReloj == -1) {
           indexReloj = 4;
         }
-        mostrarConfiguracionReloj(indexReloj);
       }
+
+      mostrarConfiguracionReloj(indexReloj);
+
+      if (codigo.value ==  contAux_MUTE) {
+        moodSettingClock = false;
+        mostrarFechaHorario();
+      }
+      
       if (codigo.value == contAux_SCAN) {
         int anio = reloj[0];
         int meses = reloj[1];
@@ -167,15 +170,13 @@ void loop() {
         mostrarFechaHorario();
       }
 
+
     } else {
-      if (codigo.value == contAux_1)    // si codigo recibido es igual a Boton_1
-        prenderApagarRele(Rele1);
+      if (codigo.value == contAux_1) prenderApagarRele(Rele1);
 
-      if (codigo.value == contAux_2)
-        mostrarTempHumd();
+      if (codigo.value == contAux_2) mostrarTempHumd();
 
-      if (codigo.value == contAux_3)
-        mostrarFechaHorario();
+      if (codigo.value == contAux_3) mostrarFechaHorario();
 
       if (codigo.value == contAux_4) {
         moodSettingClock = true;
@@ -219,20 +220,20 @@ void mostrarConfiguracionReloj(int indexReloj) {
   //Mounth
   if (indexReloj == 1) {
     mostrarPantalla("Mounth", 0, true);
-    
-    if ( reloj[indexReloj] > 12 )reloj[indexReloj] = 0;
-    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 12;
-    
+
+    if ( reloj[indexReloj] > 12 )reloj[indexReloj] = 1;
+    if ( reloj[indexReloj] < 1 )reloj[indexReloj] = 12;
+
     thisString = String(reloj[indexReloj]);
     mostrarPantalla(thisString, 1, false);
   }
   //Day
   if (indexReloj == 2) {
     mostrarPantalla("Day", 0, true);
-    
-    if ( reloj[indexReloj] > 31 ) reloj[indexReloj] = 0;
-    if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 31;
-    
+
+    if ( reloj[indexReloj] > 31 ) reloj[indexReloj] = 1;
+    if ( reloj[indexReloj] < 1 )reloj[indexReloj] = 31;
+
     thisString = String(reloj[indexReloj]);
     mostrarPantalla(thisString, 1, false);
   }
@@ -242,17 +243,17 @@ void mostrarConfiguracionReloj(int indexReloj) {
 
     if ( reloj[indexReloj] > 23 ) reloj[indexReloj] = 0;
     if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 23;
-    
+
     thisString = String(reloj[indexReloj]);
     mostrarPantalla(thisString, 1, false);
   }
   //Minutos
   if (indexReloj == 4) {
-    mostrarPantalla("Minutos", 0, true);
+    mostrarPantalla("Minutes", 0, true);
 
     if ( reloj[indexReloj] > 59 ) reloj[indexReloj] = 0;
     if ( reloj[indexReloj] < 0 )reloj[indexReloj] = 59;
-    
+
     thisString = String(reloj[indexReloj]);
     mostrarPantalla(thisString, 1, false);
   }
