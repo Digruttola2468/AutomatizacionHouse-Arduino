@@ -92,6 +92,11 @@ int reloj[] = {2022, 1, 10, 18, 55};
 int indexReloj = 0;
 bool moodSettingClock = false;
 
+int moodSettingAlarma = false;
+int alarma[] = {20,30}; //{hour,minutes}
+int existsAlarm = false;
+int indexAlarma = 0;
+
 void setup() {
   //Inicializamos
   Serial.begin(9600);
@@ -171,6 +176,41 @@ void loop() {
       }
 
 
+    } else if(moodSettingAlarma){
+      if (codigo.value == contAux_VolPlus) alarma[indexAlarma] += 1;
+
+      if (codigo.value == contAux_VolRest) alarma[indexAlarma] -= 1;
+
+      if (codigo.value == contAux_CHPlus) {
+        indexAlarma++;
+        if (indexAlarma == 1) {
+          indexAlarma = 0;
+        }
+      }
+      if (codigo.value == contAux_CHRest) {
+        indexAlarma--;
+        if (indexAlarma == -1) {
+          indexAlarma = 1;
+        }
+      }
+
+      mostrarConfiguracionAlarma(indexAlarma);
+      
+      if (codigo.value ==  contAux_MUTE) {
+        moodSettingAlarma = false;
+        mostrarFechaHorario();
+      }
+      if (codigo.value == contAux_SCAN) {
+        
+        mostrarPantalla("Se Guardo", 0, true);
+        mostrarPantalla("Correctamente", 1, false);
+        delay(2000);
+        
+        existsAlarm = true;
+        moodSettingAlarma = false;
+        mostrarFechaHorario();
+      }
+      
     } else {
       if (codigo.value == contAux_1) prenderApagarRele(Rele1);
 
@@ -183,7 +223,11 @@ void loop() {
         mostrarPantalla(" Configuracion ", 0, true);
         mostrarPantalla("De Fecha y Hora", 1, false);
       }
-
+      if (codigo.value == contAux_5) {
+        moodSettingAlarma = true;
+        mostrarPantalla(" Setting Alarm ", 0, true);
+        mostrarPantalla("Select Hour&Min", 1, false);
+      }
     }
 
     irrecv.resume();
@@ -199,6 +243,14 @@ void loop() {
     if (DataBluetooth == '3') mostrarFechaHorario();
   }
 
+  if (existsAlarm) {
+    DateTime fecha = rtc.now();
+    if(fecha.hour() == alarma[0] && fecha.minute() == alarma[1]){
+      prenderApagarRele(Rele1);
+      
+      existsAlarm = false;
+    }
+  }
 }
 
 void mostrarPantalla (String mensaje , int cursor, boolean clear) {
@@ -269,6 +321,29 @@ void mostrarTempHumd() {
   lcd.print("Humd: ");  // escribe el texto
   lcd.print(humd);
   lcd.print(" %");
+}
+
+void mostrarConfiguracionAlarma (int indexAlarma) {
+  String thisString = "";
+  if (indexAlarma == 0) {
+    mostrarPantalla("Hour", 0, true);
+
+    if ( alarma[indexAlarma] > 23 ) alarma[indexAlarma] = 0;
+    if ( alarma[indexAlarma] < 0 ) alarma[indexAlarma] = 23;
+
+    thisString = String(alarma[indexAlarma]);
+    mostrarPantalla(thisString, 1, false);
+  }
+  //Minutos
+  if (indexAlarma == 1) {
+    mostrarPantalla("Minutes", 0, true);
+
+    if ( alarma[indexAlarma] > 59 ) alarma[indexAlarma] = 0;
+    if ( alarma[indexAlarma] < 0 )  alarma[indexAlarma] = 59;
+
+    thisString = String(alarma[indexAlarma]);
+    mostrarPantalla(thisString, 1, false);
+  }
 }
 
 void prenderApagarRele(int pinRele) {
