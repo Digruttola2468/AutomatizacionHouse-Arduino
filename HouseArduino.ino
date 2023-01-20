@@ -87,15 +87,23 @@ RTC_DS3231 rtc;     // crea objeto del tipo RTC_DS3231
 int humd = 0;
 int temp = 0;
 char DataBluetooth = '0';
+unsigned long startMillis;
+unsigned long currentMillis;
+const unsigned long period = 2000;
+bool isClock = false;
+bool isTempHumd = false;
 
+//Variables Reloj
 int reloj[] = {2022, 1, 10, 18, 55};
 int indexReloj = 0;
 bool moodSettingClock = false;
 
+//Variables Alarma
 int moodSettingAlarma = false;
 int alarma[] = {20,30}; //{hour,minutes}
 int existsAlarm = false;
 int indexAlarma = 0;
+
 
 void setup() {
   //Inicializamos
@@ -124,6 +132,8 @@ void setup() {
 
   //Definimos las salidas
   pinMode(Rele1, OUTPUT);
+
+  startMillis = millis();
 }
 
 void loop() {
@@ -131,6 +141,19 @@ void loop() {
   temp = dht.readTemperature();
   humd = dht.readHumidity();
 
+  currentMillis = millis();  //get the current time
+  if (currentMillis - startMillis >= period){  //test whether the period has elapsed
+    if (!moodSettingAlarma && !moodSettingClock) 
+      if(isClock) mostrarFechaHorario();
+      else if(isTempHumd) mostrarTempHumd();
+
+
+
+      
+        
+    startMillis = currentMillis;
+  }
+  
   //------------------------------------------------------------
 
   if (irrecv.decode(&codigo)) {
@@ -312,6 +335,8 @@ void mostrarConfiguracionReloj(int indexReloj) {
 }
 
 void mostrarTempHumd() {
+  isClock = false;
+  isTempHumd = true;
   lcd.clear();
   lcd.setCursor(0, 0);    // ubica cursor en columna 0 y linea 0
   lcd.print("Temp: ");  // escribe el texto
@@ -352,6 +377,8 @@ void prenderApagarRele(int pinRele) {
 }
 
 void mostrarFechaHorario() {
+  isClock = true;
+  isTempHumd = false;
   DateTime fecha = rtc.now();
 
   lcd.clear();
