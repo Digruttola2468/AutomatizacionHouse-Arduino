@@ -42,7 +42,7 @@
 */
 /*Conect DHT11
   OUT -> PIN 3
-*/
+*/     
 /*Conect ControlRemoto
   OUT -> PIN 2
 */
