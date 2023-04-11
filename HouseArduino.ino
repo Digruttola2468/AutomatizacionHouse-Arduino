@@ -104,6 +104,8 @@ int alarma[] = {20,30}; //{hour,minutes}
 int existsAlarm = false;
 int indexAlarma = 0;
 
+int pinEntrada = 8;
+bool ESTADO = true;
 
 void setup() {
   //Inicializamos
@@ -134,6 +136,9 @@ void setup() {
   pinMode(Rele1, OUTPUT);
 
   startMillis = millis();
+
+  pinMode(pinEntrada,INPUT);
+  digitalWrite(pinEntrada,LOW);
 }
 
 void loop() {
@@ -141,6 +146,14 @@ void loop() {
   temp = dht.readTemperature();
   humd = dht.readHumidity();
 
+  if(digitalRead(pinEntrada) == HIGH){
+    ESTADO = true;
+  }
+  if(digitalRead(pinEntrada) == LOW && ESTADO){
+    prenderApagarRele(Rele1);
+    ESTADO = false;
+  }
+  
   currentMillis = millis();  //get the current time
   if (currentMillis - startMillis >= period){  //test whether the period has elapsed
     if (!moodSettingAlarma && !moodSettingClock) 
